@@ -4,6 +4,7 @@ import com.jcorpse.proxypool.config.Constant;
 import com.jcorpse.proxypool.domain.Proxy;
 import com.jcorpse.proxypool.domain.WebPage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.client5.http.HttpHostConnectException;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.cookie.BasicCookieStore;
@@ -17,6 +18,7 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.client5.http.ssl.TrustAllStrategy;
+import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -27,6 +29,8 @@ import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 
 
 @Slf4j
@@ -45,7 +49,7 @@ public class HttpManager {
                     .setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(Timeout.ofSeconds(3)).build())
                     .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.STRICT)
                     .setConnPoolPolicy(PoolReusePolicy.LIFO)
-                    .setConnectionTimeToLive(TimeValue.ofMinutes(1))
+                    .setConnectionTimeToLive(TimeValue.ofSeconds(3))
                     .build();
         } catch (Exception e) {
             log.error("HttpPoolManager init error: {}", e.getMessage());
@@ -73,35 +77,31 @@ public class HttpManager {
                 .setDefaultCookieStore(cookieStore);
 
         if (proxy != null) {
-            ClientBuilder.setProxy(proxy.getHttpHost());
+            ClientBuilder.setProxy(new HttpHost(proxy.getIp(), proxy.getPort()));
         }
 
         return ClientBuilder.build();
     }
 
-    public CloseableHttpResponse getResponse(String url) {
-        return getResponse(url, 30000L);
+    public CloseableHttpResponse getResponse(String url) throws IOException {
+        return getResponse(url, 30L);
     }
 
-    public CloseableHttpResponse getResponse(String url, long timeout) {
+    public CloseableHttpResponse getResponse(String url, long timeout) throws IOException {
         return getResponse(url, timeout, null);
     }
 
-    public CloseableHttpResponse getResponse(String url, long timeout, Proxy proxy) {
+    public CloseableHttpResponse getResponse(String url, long timeout, Proxy proxy) throws IOException {
         HttpGet httpGet = new HttpGet(url);
         return getResponse(httpGet, timeout, proxy);
     }
 
-    public CloseableHttpResponse getResponse(HttpGet httpGet, long timeout, Proxy proxy) {
+    public CloseableHttpResponse getResponse(HttpGet httpGet, long timeout, Proxy proxy) throws IOException {
         CloseableHttpResponse response = null;
-        try {
-            if (proxy != null) {
-                response = createHttpClient(timeout, proxy).execute(httpGet);
-            } else {
-                response = createHttpClient(timeout, null).execute(httpGet);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (proxy != null) {
+            response = createHttpClient(timeout, proxy).execute(httpGet);
+        } else {
+            response = createHttpClient(timeout, null).execute(httpGet);
         }
         return response;
     }
@@ -111,7 +111,7 @@ public class HttpManager {
     }
 
     public WebPage getPage(String url, String charset) {
-        return getPage(url, charset, 30000L);
+        return getPage(url, charset, 30L);
     }
 
     public WebPage getPage(String url, String charset, long timeout) {
@@ -120,7 +120,12 @@ public class HttpManager {
 
     public WebPage getPage(String url, String charset, long timeout, Proxy proxy) {
         WebPage page = new WebPage();
-        CloseableHttpResponse response = getResponse(url, timeout, proxy);
+        CloseableHttpResponse response = null;
+        try {
+            response = getResponse(url, timeout, proxy);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         if (response != null) {
             page.setUrl(url);
             page.setCode(response.getCode());
@@ -144,9 +149,14 @@ public class HttpManager {
     }
 
     public boolean checkProxy(Proxy proxy) {
-        CloseableHttpResponse response = getResponse("https://api.ipify.org/?format=json", 3000L, proxy);
-        if (response.getCode() == 200) {
-            return true;
+        CloseableHttpResponse response = null;
+        try {
+            response = getResponse("https://api.ipify.org/?format=json", 3L, proxy);
+            if (response != null && response.getCode() == 200) {
+                return true;
+            }
+        } catch (IOException e) {
+
         }
         return false;
     }

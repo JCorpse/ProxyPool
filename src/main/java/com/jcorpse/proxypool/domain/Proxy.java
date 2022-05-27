@@ -2,10 +2,8 @@ package com.jcorpse.proxypool.domain;
 
 import lombok.Data;
 import org.apache.hc.core5.http.HttpHost;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -31,8 +29,4 @@ public class Proxy implements Serializable {
     private boolean anonymous;
     private String country;
     private long verifytime;
-
-    public HttpHost getHttpHost() {
-        return new HttpHost(ip, port);
-    }
 }

@@ -1,10 +1,18 @@
 package com.jcorpse.proxypool.repository;
 
 import com.jcorpse.proxypool.domain.Proxy;
-import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
-import org.springframework.stereotype.Repository;
+import com.mongodb.client.result.DeleteResult;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 
-@Repository
-public interface ProxyRepository extends ReactiveMongoRepository<Proxy, String> {
+public interface ProxyRepository {
+
+    Mono<Proxy> save(Proxy proxy);
+
+    Mono<DeleteResult> delete(Proxy proxy);
+
+    Flux<Proxy> findAll();
+
+    Flux<Proxy> findByCustom(Integer limit, boolean available, boolean anonymous, String country);
 }
